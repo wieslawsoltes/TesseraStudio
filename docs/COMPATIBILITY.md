@@ -1,0 +1,25 @@
+# Feature and compatibility boundaries
+
+This release is a functional browser texturing application, not a full clone of Mari and not qualified for production asset delivery. All limits below describe the actual implemented code.
+
+| Area | Implemented | Boundary |
+|---|---|---|
+| Renderer | WebGPU array textures, WebGL 2 fallback, metallic/roughness BRDF, analytic lights, normal/height/emission channels, MSAA on WebGPU | No path tracing, ray tracing, HDRI loading, production renderer matching, displacement tessellation or advanced light transport. Ground shadow is an analytic visual approximation. |
+| Painting | CPU BVH hit testing, UV interpolation, Canvas2D stamps, pen-size pressure, eraser, fill, eyedropper, undo/redo | Brush size is in texture pixels; cursor is approximate in 3D. Strokes break across distant UV islands. No projection paint buffer, seam padding/cross-UDIM edge stamping, screen projection baking, clone, heal, smudge or multi-paint streams. |
+| Texture precision | RGBA8 Canvas2D layers; six channels; 256/512/1024/2048 tile sizes | No 16/32-bit float painting, 4K–32K virtual textures, out-of-core paging or resolution-independent raster history. 2048 projects can consume substantial browser memory. |
+| UDIMs | Four horizontal tiles: 1001–1004 | Other tiles are rejected. Faces are expected to remain within one tile. Repeated UV islands paint together. No automatic UV unwrap, Ptex or arbitrary UDIM grids. |
+| Layers | Paint, fill, procedural and embedded-image layers; blending, visibility, locking, opacity, duplication, drag order; checker mask | No arbitrary painted masks, nested groups, full adjustment-layer suite or complete Mari graph semantics. Layer locks are editing affordances, not collaborator ownership locks. |
+| Nodes | Fixed connected shading pipeline with editable color-grade and PBR/lighting parameters | No arbitrary graph connection editor, execution compiler, reusable node packages, graph cycles or native Mari nodes. Grade modifies viewport output, not exported texture data. |
+| Procedurals | Seeded noise, checker, stripes, cells; material presets | No geometry-map baking, curvature/AO-driven smart materials, Substance/SBSAR, texture transfer or artist brush libraries. |
+| Geometry | Procedural sample geometry and primitives; triangle-list mesh; OBJ with normals and UVs; BVH; OBJ export | No FBX, Alembic, USD, glTF, animation or native scene formats. Convex OBJ polygons are triangle-fanned; detected concave polygons are rejected. Import expects valid UVs and caps input at 500,000 triangles. OBJ materials/textures are not loaded. |
+| Images/export | PNG/JPEG/WebP import; embedded project data; PNG maps; stored ZIP texture sets; JSON and OBJ | No EXR/TIFF/PSD or native Mari projects. No ICC/OCIO/ACES transform pipeline. sRGB tagging is a workflow convention; PNG color-profile embedding is not certified. |
+| Collaboration | Durable snapshot + ordered operations, 2-second polling, idempotent retry, editor/reviewer roles, comments, offline-operation recovery, invite expiry and member removal | No WebSocket presence, cursors, voice, CRDT transformations, enterprise SSO/SCIM/audit retention/administration, production load qualification or log compaction. Property updates follow server order; same-property undo can override a collaborator. |
+| Sharing | Project invite links and membership; authenticated hosted API | Visitors require both site access and project permission. The delivered site begins owner-private. The local launcher intentionally has one local identity. |
+| UI | Dark/light workspace, responsive panels, keyboard shortcuts, split/UV views and fixed shading graph | Inspired by desktop texturing tools; not pixel-identical Mari. No native floating windows, arbitrary docking or complete accessibility/keyboard parity for every canvas interaction. |
+| Performance | GPU material rendering, indexed BVH lookup, cached layer composition, changed-tile uploads, on-demand rendering | Textures replay on CPU; large stroke histories and many layers can become slow. No measured hardware performance guarantees. Frame time is CPU submission time, not GPU execution time. |
+
+Browser-driven interaction/visual testing, physical GPU testing, pen-tablet qualification, interoperability certification, adversarial security testing and production-scale testing were not performed. The included tests establish bounded engine/API behaviors only.
+
+## GitHub Pages deployment
+
+The static edition keeps rendering, painting, local saves, exports and local review notes. IndexedDB replaces the HTTP API through an injectable request transport. Database names are scoped to the app path to avoid accidental collisions between project sites. This is not account authentication or a security boundary on a shared origin. Same-browser tabs share one designer identity and ordered local edits; cross-device collaboration, invitations and enterprise identity require the separately deployed server. Browser storage may be denied, cleared or evicted. Export project backups.

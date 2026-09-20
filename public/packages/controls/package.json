@@ -1,0 +1,19 @@
+{
+  "name": "@tessera/controls",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Vanilla JavaScript texture-studio controls and layer-stack web component",
+  "license": "MIT",
+  "main": "./index.js",
+  "exports": {
+    ".": "./index.js",
+    "./*": "./*"
+  },
+  "files": [
+    "*.js",
+    "LICENSE",
+    "README.md",
+    "*.css"
+  ],
+  "sideEffects": true
+}

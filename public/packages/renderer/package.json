@@ -1,0 +1,18 @@
+{
+  "name": "@tessera/renderer",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "WebGPU and WebGL 2 material renderer",
+  "license": "MIT",
+  "main": "./index.js",
+  "exports": {
+    ".": "./index.js",
+    "./*": "./*"
+  },
+  "files": [
+    "*.js",
+    "LICENSE",
+    "README.md"
+  ],
+  "sideEffects": false
+}

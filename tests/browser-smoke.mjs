@@ -1,0 +1,103 @@
+import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
+import { spawn } from 'node:child_process';
+import { mkdir, writeFile } from 'node:fs/promises';
+
+const require = createRequire(import.meta.url);
+const { chromium } = require(process.env.TESSERA_TEST_RUNTIME ? process.env.TESSERA_TEST_RUNTIME + '/node_modules/playwright' : 'playwright');
+const externalURL = process.env.TESSERA_TEST_URL;
+const base = externalURL || 'http://127.0.0.1:4173/TesseraStudio/';
+const server = externalURL ? null : spawn(process.execPath, ['scripts/preview-pages.mjs'], { stdio: 'inherit' });
+const results = [], errors = [], failures = [], requests = [];
+let browser, page;
+try {
+    for (let i = 0; i < 100; i++) {
+        try { if ((await fetch(base)).ok) break; } catch { }
+        if (i === 99) throw new Error('Preview server did not start.');
+        await new Promise(r => setTimeout(r, 100));
+    }
+    browser = await chromium.launch({ headless: true, args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
+    const context = await browser.newContext({ viewport: { width: 1600, height: 1000 }, acceptDownloads: true });
+    page = await context.newPage();
+    page.on('pageerror', error => errors.push(error.message));
+    page.on('request', request => requests.push(request.url()));
+    page.on('response', response => { if (response.status() >= 400) failures.push(`${response.status()} ${response.url()}`); });
+    await page.goto(base);
+    await page.waitForFunction(() => window.tessera?.renderer?.backend, null, { timeout: 60000 });
+    assert.equal(await page.evaluate(() => window.tessera.storageMode), 'browser');
+    results.push('Static subpath startup and renderer initialization');
+    await page.locator('[data-view="uv"]').click();
+    await page.waitForTimeout(300);
+    const canvas = page.locator('#uvcanvas'), box = await canvas.boundingBox();
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width / 2 + 40, box.y + box.height / 2 + 12, { steps: 8 });
+    await page.mouse.up();
+    const strokeCount = await page.evaluate(() => window.tessera.project.channels.basecolor.flatMap(l => l.strokes || []).length);
+    assert.ok(strokeCount > 0, 'UV painting must create a real stroke');
+    results.push('UV pointer painting produces editable strokes');
+    await page.keyboard.press('Control+s');
+    await page.waitForFunction(() => location.search.includes('project=') && document.querySelector('#save-state').textContent === 'Saved in this browser');
+    const projectURL = page.url();
+    await page.evaluate(() => window.tessera.commit({ type: 'rename', name: 'Pages persistence check' }, 'Rename project'));
+    await page.waitForFunction(() => document.querySelector('#save-state').textContent === 'Saved in this browser');
+    await page.reload();
+    await page.waitForFunction(() => window.tessera?.project.name === 'Pages persistence check', null, { timeout: 60000 });
+    assert.equal(await page.evaluate(() => window.tessera.project.channels.basecolor.flatMap(l => l.strokes || []).length), strokeCount);
+    results.push('Save, automatic edit persistence, and reload recover project and strokes');
+    const second = await context.newPage();
+    await second.goto(projectURL);
+    await second.waitForFunction(() => window.tessera?.project.name === 'Pages persistence check', null, { timeout: 60000 });
+    await second.evaluate(() => window.tessera.commit({ type: 'rename', name: 'Second tab edit' }, 'Rename'));
+    await page.waitForFunction(() => window.tessera.project.name === 'Second tab edit', null, { timeout: 15000 });
+    results.push('Same-browser tabs synchronize ordered edits');
+    await second.close();
+    const storageChecks = await page.evaluate(async () => {
+        const { BrowserProjectService } = await import('./packages/storage/index.js');
+        const { createProject } = await import('./packages/core/project.js');
+        const name = 'tessera-smoke-' + crypto.randomUUID();
+        const a = new BrowserProjectService({ databaseName: name }), b = new BrowserProjectService({ databaseName: name });
+        const { id } = await a.request('/projects', { method: 'POST', body: JSON.stringify({ project: createProject('Storage fixture', 'Sphere', 256) }) });
+        const send = (client, idValue, nameValue) => client.request(`/projects/${id}/ops`, { method: 'POST', body: JSON.stringify({ id: idValue, payload: { type: 'rename', name: nameValue } }) });
+        const concurrent = await Promise.all(Array.from({ length: 55 }, (_, i) => send(i % 2 ? a : b, 'op-' + i, 'Name ' + i)));
+        const duplicate = await send(b, 'op-0', 'Not applied');
+        const first = await a.request(`/projects/${id}/ops?after=0`);
+        const tail = await b.request(`/projects/${id}/ops?after=${first.operations.at(-1).seq}`);
+        await a.request(`/projects/${id}/comments`, { method: 'POST', body: JSON.stringify({ text: 'Local review', channel: 'basecolor', tile: 0 }) });
+        await a.close(); await b.close();
+        const reopened = new BrowserProjectService({ databaseName: name });
+        const comments = await reopened.request(`/projects/${id}/comments`);
+        await reopened.close();
+        indexedDB.deleteDatabase(name);
+        return { unique: new Set(concurrent.map(x => x.seq)).size, duplicate: duplicate.duplicate, first: first.operations.length, more: first.hasMore, tail: tail.operations.length, done: !tail.hasMore, comments: comments.comments[0].text };
+    });
+    assert.deepEqual(storageChecks, { unique: 55, duplicate: true, first: 50, more: true, tail: 5, done: true, comments: 'Local review' });
+    results.push('IndexedDB concurrency, idempotency, pagination, and review-note durability');
+    await page.locator('[data-action="share"]').click();
+    assert.match(await page.locator('.dialog').innerText(), /does not upload your textures/);
+    const downloadPromise = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Download project', exact: true }).click();
+    const download = await downloadPromise;
+    assert.ok(download.suggestedFilename().endsWith('.tessera.json'));
+    results.push('Sharing boundary is explicit and editable-project export downloads');
+    await page.locator('[data-view="3d"]').click();
+    await page.waitForTimeout(400);
+    await mkdir('artifacts', { recursive: true });
+    await page.screenshot({ path: 'artifacts/pages-desktop.png', fullPage: true });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.screenshot({ path: 'artifacts/pages-mobile.png', fullPage: true });
+    assert.deepEqual(errors, [], 'No uncaught browser errors');
+    assert.deepEqual(failures, [], 'All app assets must load');
+    assert.ok(!requests.some(url => new URL(url).pathname.startsWith('/api')), 'Static mode must not request a nonexistent backend');
+    results.push('Desktop/mobile capture, no missing assets or uncaught errors, no API requests');
+    console.log(JSON.stringify({ passed: results, backend: await page.evaluate(() => window.tessera.renderer.backend) }, null, 2));
+} catch (error) {
+    await mkdir('artifacts', { recursive: true });
+    await page?.screenshot({ path: 'artifacts/pages-failure.png', fullPage: true }).catch(() => {});
+    throw error;
+} finally {
+    await mkdir('artifacts', { recursive: true });
+    await writeFile('artifacts/browser-results.json', JSON.stringify({ passed: results, errors, failedResponses: failures }, null, 2));
+    await browser?.close();
+    server?.kill();
+}

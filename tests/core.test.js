@@ -1,0 +1,21 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { identity, inverse, multiply, OrbitCamera } from '../public/packages/core/math.js';
+import { createDemoMesh, parseOBJ, createPrimitive, exportOBJ } from '../public/packages/core/mesh.js';
+import { createProject, createLayer, applyOperation, CommandHistory, validateProject } from '../public/packages/core/project.js';
+import { crc32, createZip } from '../public/packages/core/zip.js';
+test('camera inverse gives center ray toward target', () => { const c = new OrbitCamera(), m = c.matrix(1.5), product = multiply(m, inverse(m)); identity().forEach((x, i) => assert.ok(Math.abs(product[i] - x) < 1e-4)); const ray = c.ray(0, 0, 1.5); assert.ok(ray.direction.every(Number.isFinite)); });
+test('BVH picks the visible surface and interpolates UV', () => { const m = createPrimitive('Sphere'), hit = m.raycast([0, 0, 4], [0, 0, -1]); assert.ok(hit); assert.ok(Math.abs(hit.distance - 2.8) < .02); assert.equal(hit.tile, 0); assert.ok(hit.uv.every(v => v >= 0 && v <= 1)); assert.equal(m.raycast([0, 4, 4], [0, 0, -1]), null); });
+test('demo has finite normals, triangles and four valid tiles', () => { const m = createDemoMesh(); assert.ok(m.triangleCount > 10000); assert.ok(m.vertices.every(Number.isFinite)); const tiles = new Set(); for (let i = 8; i < m.vertices.length; i += 9)
+    tiles.add(m.vertices[i]); assert.deepEqual([...tiles].sort(), [0, 1, 2, 3]); assert.ok(m.raycast([0, 0, 5], [0, 0, -1])); });
+test('OBJ import preserves separate UV indices and negative references', () => { const m = parseOBJ('v 0 0 0\nv 1 0 0\nv 0 1 0\nvt 1 0\nvt 2 0\nvt 1 1\nf -3/-3 -2/-2 -1/-1'); assert.equal(m.triangleCount, 1); assert.equal(m.vertices[8], 1); assert.equal(m.vertices[6], 0); assert.equal(m.vertices[7], 1); assert.equal(m.vertices[15], 1); });
+test('OBJ rejects UV-less and unsupported tiles', () => { assert.throws(() => parseOBJ('v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3'), /UV/); assert.throws(() => parseOBJ('v 0 0 0\nv 1 0 0\nv 0 1 0\nvt 5.1 0\nvt 5.9 0\nvt 5.1 1\nf 1/1 2/2 3/3'), /1001/); });
+test('geometry export and reimport preserve triangle count', () => { const m = createPrimitive('Cube'), restored = parseOBJ(exportOBJ(m)); assert.equal(restored.triangleCount, m.triangleCount); });
+test('stable stroke identities make retry idempotent; undo removes only own stroke', () => { const p = createProject(), h = new CommandHistory(), layerId = 'basecolor-paint', a = { type: 'stroke', channel: 'basecolor', layerId, stroke: { id: 'stroke-a', points: [[.1, .2, 1]], tile: 0 } }, b = { ...a, stroke: { id: 'stroke-b', points: [[.2, .3, 1]], tile: 0 } }; h.execute(p, a, 'stroke'); applyOperation(p, b); applyOperation(p, a); assert.equal(p.channels.basecolor[1].strokes.length, 2); h.undo(p); assert.deepEqual(p.channels.basecolor[1].strokes.map(s => s.id), ['stroke-b']); h.redo(p); assert.equal(p.channels.basecolor[1].strokes.length, 2); });
+test('layer reorder preserves concurrently added layers', () => { const p = createProject(), l = createLayer(); applyOperation(p, { type: 'addLayer', channel: 'basecolor', layer: l }); applyOperation(p, { type: 'reorder', channel: 'basecolor', ids: ['basecolor-paint', 'basecolor-base'] }); assert.equal(p.channels.basecolor.at(-1).id, l.id); assert.equal(p.channels.basecolor.length, 3); });
+test('project validation rejects corrupt resolutions and geometry', () => { const p = createProject(); assert.equal(validateProject(p), p); assert.throws(() => validateProject({ ...p, resolution: 999 })); assert.throws(() => validateProject({ ...p, meshData: { vertices: [0, 1] } })); });
+test('ZIP CRC and container signatures match specification', async () => { assert.equal(crc32(new TextEncoder().encode('123456789')), 0xcbf43926); const blob = createZip([{ name: 'tile.1001.txt', data: 'hello' }]), data = new DataView(await blob.arrayBuffer()); assert.equal(data.getUint32(0, true), 0x04034b50); assert.equal(data.getUint32(data.byteLength - 22, true), 0x06054b50); });
+test('sphere normals face outwards', () => { const mesh = createPrimitive('Sphere'), v = mesh.vertices; for (let i = 0; i < v.length; i += 9) {
+    const d = v[i] * v[i + 3] + v[i + 1] * v[i + 4] + v[i + 2] * v[i + 5];
+    assert.ok(d > 1, 'normal faces inward');
+} });

@@ -1,0 +1,21 @@
+{
+  "name": "@tessera/storage",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Transactional IndexedDB project storage for static Tessera deployments",
+  "license": "MIT",
+  "main": "./index.js",
+  "exports": {
+    ".": "./index.js",
+    "./*": "./*"
+  },
+  "files": [
+    "*.js",
+    "LICENSE",
+    "README.md"
+  ],
+  "sideEffects": false,
+  "peerDependencies": {
+    "@tessera/core": "0.1.x"
+  }
+}

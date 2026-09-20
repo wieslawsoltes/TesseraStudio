@@ -1,0 +1,15 @@
+tessera-layer-stack { display:block; color:var(--text,#e2e6e8); font:13px/1.45 system-ui,sans-serif; }
+tessera-layer-stack .layer-row { display:grid; grid-template-columns:22px 30px minmax(0,1fr) 21px; align-items:center; gap:7px; padding:10px 11px; border-bottom:1px solid var(--line,#343a3e); cursor:pointer; }
+tessera-layer-stack .layer-row.active { background:var(--accent-bg,#364441); box-shadow:inset 2px 0 var(--accent,#75dcc8); }
+tessera-layer-stack button { border:0; background:transparent; color:inherit; cursor:pointer; padding:0; }
+tessera-layer-stack .layer-thumb { width:30px; height:30px; border:1px solid #62746f; border-radius:3px; }
+tessera-layer-stack .layer-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+tessera-layer-stack small { display:block; color:var(--muted,#95a39e); font-size:11px; }
+.icon { width:17px; height:17px; fill:none; stroke:currentColor; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; }
+.toast { position:fixed; bottom:43px; left:50%; transform:translateX(-50%); background:#354640; color:#e2e6e8; border:1px solid #648d7e; border-radius:7px; padding:11px 18px; font:13px system-ui,sans-serif; z-index:100; max-width:90vw; }
+.toast.error { background:#4f3030; border-color:#ac6969; }
+.dialog { position:fixed; inset:0; background:#0009; z-index:50; display:grid; place-items:center; padding:20px; color:var(--text,#e2e6e8); font:14px system-ui,sans-serif; }
+.dialog-card { background:var(--panel,#252b2e); border:1px solid #526065; border-radius:10px; width:min(570px,94vw); max-height:85vh; overflow:auto; }
+.dialog-head { display:flex; align-items:center; gap:16px; padding:18px 22px; border-bottom:1px solid var(--line,#373c40); font-size:17px; font-weight:600; }
+.dialog-head .spacer { flex:1; }.dialog-body { padding:20px 22px; }.dialog-foot { display:flex; justify-content:flex-end; gap:9px; padding:15px 22px; border-top:1px solid var(--line,#373c40); }
+.dialog button { border:1px solid #596666; border-radius:5px; color:inherit; background:transparent; font:inherit; padding:6px 10px; cursor:pointer; }.dialog button.primary { color:#163b31; background:#75dcc8; }.dialog input,.dialog select,.dialog textarea { color:inherit; background:#1d2326; border:1px solid #596666; border-radius:4px; padding:8px; font:inherit; }.dialog .field { display:flex; flex-direction:column; gap:7px; margin:0 0 15px; }
