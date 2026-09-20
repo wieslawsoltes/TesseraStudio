@@ -1,0 +1,56 @@
+name: Validate and deploy Pages
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: tessera-pages-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install isolated test dependencies
+        run: |
+          npm install --prefix "$RUNNER_TEMP/tessera-test-runtime" --no-audit --no-fund --ignore-scripts @napi-rs/canvas@0.1.80 playwright@1.55.0
+          node "$RUNNER_TEMP/tessera-test-runtime/node_modules/playwright/cli.js" install --with-deps chromium
+          echo "TESSERA_TEST_RUNTIME=$RUNNER_TEMP/tessera-test-runtime" >> "$GITHUB_ENV"
+          echo "CODEX_PRIMARY_RUNTIME_NODE_MODULES=$RUNNER_TEMP/tessera-test-runtime/node_modules" >> "$GITHUB_ENV"
+      - name: Unit, raster, and static-build tests
+        run: node --test tests/*.test.js
+      - name: Build static browser-local edition
+        run: node scripts/build-pages.mjs
+      - name: Browser smoke tests
+        run: node tests/browser-smoke.mjs
+      - name: Package standalone libraries
+        run: node scripts/package-libraries.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: tessera-validation
+          path: artifacts/
+      - uses: actions/upload-pages-artifact@v3
+        if: github.event_name != 'pull_request'
+        with:
+          path: dist/pages
+  deploy:
+    if: github.event_name != 'pull_request'
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/configure-pages@v5
+      - id: deployment
+        uses: actions/deploy-pages@v4
