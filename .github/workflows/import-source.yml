@@ -1,4 +1,4 @@
-name: Import verified source scaffold
+name: Import complete Tessera source
 on:
   push:
     paths: ['.github/workflows/import-source.yml']
@@ -10,131 +10,30 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/checkout@v4
-        with:
-          repository: wieslawsoltes/Folio
-          ref: f4aa4ece80c8db13c4cb456bbd41aed6fdc0efbd
-          path: .source-template
-          persist-credentials: false
-      - name: Recover only byte-identical shared scaffold files
+      - name: Restore checksum-verified source
         shell: python
         run: |
-          import hashlib, pathlib, subprocess
-          manifest = '''
-          9f274d6425b9792ae0a70cb0b96a29fd98ec6ed6 .npmrc
-          a0ae2ed9a9771b5fc36a06af554a05c18b2a13b3 app/chatgpt-auth.ts
-          4243cb4a9aaa50f954498e54c850773e9ba13eea build/sites-vite-plugin.LICENSE
-          2ece1b96530b40a7ea4981e6341b52771a07813e build/sites-vite-plugin.ts
-          856e090c902917b4e1cebee0e08ea1d398fd01c3 cloudflare-env.d.ts
-          c8f5bb16f79ed774f67415a8dc2b4a38243e3e90 components.json
-          91e3a250ce6ee0797b0258454d774800650adcc8 components/ui/accordion.tsx
-          dad327341382f200b84d5f833eb1b7a74b0e7469 components/ui/alert-dialog.tsx
-          f99164ed4b320790482f514342dab5e72f284aca components/ui/alert.tsx
-          57e38fa96f9c0cb767d7b8de0d6dbc171d1b921a components/ui/aspect-ratio.tsx
-          5bdd1ce7db5800eb55198cd0291a1e47dc67fb0d components/ui/attachment.tsx
-          ea658505703a577fe93341e5e1a0b478c27245f7 components/ui/avatar.tsx
-          6eb2a057aae0e23a74368cc4daf9657210e9a740 components/ui/badge.tsx
-          004bb63a4c92229e612b6126d79fb7b078aa7565 components/ui/breadcrumb.tsx
-          792146e61d80ef595d032d5d09a3d572d50f1374 components/ui/bubble.tsx
-          cd550d7afca6562548afe3f595b352406f7f3951 components/ui/button-group.tsx
-          4d38506cee5430d95a59ec6a2a0cef2b79217e7a components/ui/button.tsx
-          5d31419b130a18c52320f5a21546a9236123b6bf components/ui/calendar.tsx
-          acf57dc5a534792273b8fb86227e92e001f3dc53 components/ui/card.tsx
-          0e05a77ea155fde6af5d9a4848b1d3953df6ea5a components/ui/carousel.tsx
-          9813c584e125847d88e9e7e7f9edff7e9ba45a97 components/ui/chart.tsx
-          f5a7e433f3795b82a00c5c06a1fc6decf116a84a components/ui/checkbox.tsx
-          2f7a4e7fc64a8874373c1584646a63f28cd63c47 components/ui/collapsible.tsx
-          2415bd801031a16bbcee8343058825feecfaea69 components/ui/combobox.tsx
-          8fe3ccb406be52d28961b0c0220e87ecd19596ca components/ui/command.tsx
-          5aaca76552cf0468b1def03c9e2c42f1f0b60734 components/ui/context-menu.tsx
-          84bdef4bb307087da1bfaf3cadf7be5dbda73f24 components/ui/dialog.tsx
-          22e165774bd595fbf41d0c45efef1cf996897983 components/ui/direction.tsx
-          ad08671442203fe345093f364696bdf43528e0b7 components/ui/drawer.tsx
-          ae1fcf62f1e3b648554789b8fe02943d92bf00fc components/ui/dropdown-menu.tsx
-          ce4b0095f6d19d2eae2e465060e9060b0c210856 components/ui/empty.tsx
-          ec849dae4d3dd06a973ba22e4b2248a25cf18148 components/ui/field.tsx
-          f371fea1bc35380d28678c6cf53df8f65deb2776 components/ui/form.tsx
-          91e869c0d3091cbeddf5cb0266e82ddf56f829a6 components/ui/hover-card.tsx
-          a7652d936fffd9c5bca4b88e6b9715bf559e667d components/ui/input-group.tsx
-          6a556afacd71996bf0e385ff2b04869fb2ee4523 components/ui/input-otp.tsx
-          f1124aea14eee062fc2f4c55dad5f0d9de0ccc1a components/ui/input.tsx
-          d5dbb1a9c2e70456e45a39887a4b7cc56d484a45 components/ui/item.tsx
-          2459224fbc531f6306b73aaeb22e9022d9985332 components/ui/kbd.tsx
-          1ac80f701ebfe9dc02d632c08cafade732e46625 components/ui/label.tsx
-          cfa76c6c014ab342befcbf7571eb932917406522 components/ui/marker.tsx
-          4af16a428377f81cbb3f66adfe518308e0b690d8 components/ui/menubar.tsx
-          0b05011259c026a357380c3834bce0ead8565d22 components/ui/message-scroller.tsx
-          53437e8db2b0fad1da06a7499e54ddaf116295c2 components/ui/message.tsx
-          3058398399ad6c029ad527052475b360b114715b components/ui/native-select.tsx
-          0a673f513c97fbeaae0872403b7582ab2ba7e3c3 components/ui/navigation-menu.tsx
-          1dcfb0cc050c5f2bdd930522d627313d03d3690c components/ui/pagination.tsx
-          30058c4ec284ca9cad1ed1162d084ce3cd94e2b0 components/ui/popover.tsx
-          b3ae25089ad549b7f13125e482f99b43dd895bd2 components/ui/progress.tsx
-          fe514536ed771f7adef0a6b9e4d1aeadc2c95481 components/ui/radio-group.tsx
-          a76832a10b4c5c2a137e25c16478567ba86daf0d components/ui/resizable.tsx
-          73c4eb1cdcd4a699b150a9ddc3e87bfb90b63d09 components/ui/scroll-area.tsx
-          c0dc7120b4f78008ae5efc6d1c8b7ec8205c35d5 components/ui/select.tsx
-          cd873e3631b571060f166897b7b62e033e87c18f components/ui/separator.tsx
-          cb53bb28b6850745c9519e8e7462e05f85a50c93 components/ui/sheet.tsx
-          f5f6c5aefc88ffa2e999e284b299472215c05161 components/ui/sidebar.tsx
-          3ec6be770b846170b8e7f8916e5f165e2d1730df components/ui/skeleton.tsx
-          46ebc4b4df1e9baf1f3997a4b6c08ef80c84a9c9 components/ui/slider.tsx
-          9b20afe2e10fd9b94d1abc1ae732054b2fb9821c components/ui/sonner.tsx
-          a70e713c5b4ecb2af186efe3fadea51805f26ba5 components/ui/spinner.tsx
-          8baa844fdb17d668b3ce07cfbd6a7ef52e2eb5eb components/ui/switch.tsx
-          7add5f1a22db954ac6cb3446f1bf8c8a9fc5c335 components/ui/table.tsx
-          b463afd170637df477e36184aa27d2ad1bd3c3e0 components/ui/tabs.tsx
-          e67d8fefe50c41dfa2deed9a5096d5be7691581a components/ui/textarea.tsx
-          9894607b212ff7182bf2024f4262da03df0a8973 components/ui/toggle-group.tsx
-          5250c98ff7f11f531af38c227230a76b7d25bf19 components/ui/toggle.tsx
-          ec65c1e4255f050d9555c6cdade90a5f8a6c0c29 components/ui/tooltip.tsx
-          19b379900d94124b674f07ffe2dbba8f70bd8d6d db/index.ts
-          c2b2f34376984744343453838ce66658ad9d9b6a drizzle.config.ts
-          1c56c0144ce558825265a2d79d06b1ce6150d24f eslint.config.mjs
-          07f8318c3c290d68163e95aa3e170ad92a235f27 examples/d1/app/api/notes/route.ts
-          7bb0c157110799b9b53c767517e0d192b7201f2e examples/d1/db/schema.ts
-          2b0fe1dfef3b17850bbac040665f514a8ffd0f15 hooks/use-mobile.ts
-          b500fb167fdaa78785feb0ff03b51f8a182a44ae lib/utils.ts
-          e9ffa3083ad279ecf95fd8eae59cb253e9a539c4 next.config.ts
-          9f23062ea28c5b1ea60eb319bcf90e639dfeed71 pnpm-lock.yaml
-          683e79a81a7546ac0d5a12d40b6aea5b8abb45be pnpm-workspace.yaml
-          61e36849cf7cfa9f1f71b4a3964a4953e3e243d3 postcss.config.mjs
-          f27aec211320d9a5fd0dbbb07f5c508222b2b8d4 scripts/execution-profile.mjs
-          624f8d98fb3aa14b80e87b11ebd25c158860e079 scripts/install-ci.mjs
-          c1da8c3bff185934dd844d85eddbf2a6e1486cca scripts/install-ci.sh
-          722a2f6c515f887d66a92ea311a846a4ccc00afc scripts/install-pnpm.sh
-          d57a1efad54ed9d0857de95c1fac5c8ecfb7c18b scripts/pnpm-install.mjs
-          166b0c2487819135ddfb30c9267e790ebb8c498f scripts/run-framework.mjs
-          1eeedb5e13e4b9af70d89446d981dfd4cd92a3fd scripts/sites-env.mjs
-          728416424d5d2f4c9a746d53621668225645356c scripts/sites-env.sh
-          be170f57ec372cc118f2d343092a53b85fc189a4 tsconfig.json
-          fad4d887a681dd49233e5ed01ee2c7a1513089a0 vendor/shadcn-tailwind-4.13.0.LICENSE.md
-          7807c58eb94de8b764b9b6b7b5d8cde6d012b17f vendor/shadcn-tailwind-4.13.0.css
-          e98afea633a7aa88ee0bab21773219a66563f9ac vite.config.ts
-          '''
-          copied = []
-          for line in manifest.strip().splitlines():
-              expected, name = line.strip().split(' ', 1)
-              source = pathlib.Path('.source-template') / name
-              if not source.is_file():
-                  print('NOT IMPORTED (missing):', name)
-                  continue
-              data = source.read_bytes()
-              actual = hashlib.sha1(b'blob ' + str(len(data)).encode() + b'\0' + data).hexdigest()
-              if actual != expected:
-                  print('NOT IMPORTED (different bytes):', name)
-                  continue
+          import base64, hashlib, json, lzma, pathlib, subprocess
+          parts = sorted(pathlib.Path('.github/source-payload').glob('part-*.txt'))
+          assert len(parts) == 8, 'Incomplete source transfer'
+          data = base64.b64decode(''.join(p.read_text() for p in parts), validate=True)
+          assert hashlib.sha256(data).hexdigest() == 'bdc33681453a22a388cd1ab7b243743008f983ae03bacdd8707c6a2896734d77', 'Source checksum mismatch'
+          files = json.loads(lzma.decompress(data))
+          assert len(files) == 65, 'Source file count mismatch'
+          for name, content in files.items():
+              path = pathlib.PurePosixPath(name)
+              assert not path.is_absolute() and '..' not in path.parts
+              assert '.git' not in path.parts and not name.startswith('.github/workflows/')
+              assert isinstance(content, str)
               target = pathlib.Path(name)
               target.parent.mkdir(parents=True, exist_ok=True)
-              target.write_bytes(data)
-              copied.append(name)
-          subprocess.run(['git', 'add', '--', *copied], check=True)
-          print('Verified source files imported:', len(copied))
-      - name: Commit verified files
+              target.write_text(content, encoding='utf-8')
+          subprocess.run(['git', 'add', '--', *files.keys()], check=True)
+          subprocess.run(['git', 'rm', '--', *[str(p) for p in parts]], check=True)
+          print('Restored and staged all', len(files), 'application source files.')
+      - name: Commit complete app and Pages support
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          if ! git diff --cached --quiet; then
-            git commit -m 'chore: recover byte-verified hosting scaffold from Tessera source manifest'
-            git push origin HEAD:main
-          fi
+          git commit -m 'feat: import complete Tessera Studio with browser-local GitHub Pages edition'
+          git push origin HEAD:main
