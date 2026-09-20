@@ -47,6 +47,8 @@ jobs:
     permissions:
       pages: write
       id-token: write
+    outputs:
+      page_url: ${{ steps.deployment.outputs.page_url }}
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -54,3 +56,28 @@ jobs:
       - uses: actions/configure-pages@v5
       - id: deployment
         uses: actions/deploy-pages@v4
+  check-live:
+    if: github.event_name != 'pull_request'
+    needs: deploy
+    runs-on: ubuntu-latest
+    env:
+      TESSERA_TEST_URL: ${{ needs.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install isolated browser test dependencies
+        run: |
+          npm install --prefix "$RUNNER_TEMP/tessera-live-runtime" --no-audit --no-fund --ignore-scripts playwright@1.55.0
+          node "$RUNNER_TEMP/tessera-live-runtime/node_modules/playwright/cli.js" install --with-deps chromium
+          echo "TESSERA_TEST_RUNTIME=$RUNNER_TEMP/tessera-live-runtime" >> "$GITHUB_ENV"
+      - name: Verify the published commit
+        run: node tests/deployed-pages.mjs
+      - name: Test the public Pages app
+        run: node tests/browser-smoke.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: tessera-live-validation
+          path: artifacts/

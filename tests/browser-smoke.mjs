@@ -26,6 +26,10 @@ try {
     await page.waitForFunction(() => window.tessera?.renderer?.backend, null, { timeout: 60000 });
     assert.equal(await page.evaluate(() => window.tessera.storageMode), 'browser');
     results.push('Static subpath startup and renderer initialization');
+    const graphIcons = await page.locator('.node-title .icon').evaluateAll(nodes => nodes.map(node => { const r = node.getBoundingClientRect(); return { width: r.width, height: r.height, position: getComputedStyle(node).position }; }));
+    assert.equal(graphIcons.length, 4);
+    assert.ok(graphIcons.every(icon => icon.width <= 20 && icon.height <= 20 && icon.position === 'static'), 'Graph icons must not inherit the full-size connection overlay style');
+    results.push('Shading-graph icons retain their intended inline size');
     await page.locator('[data-view="uv"]').click();
     await page.waitForTimeout(300);
     const canvas = page.locator('#uvcanvas'), box = await canvas.boundingBox();
